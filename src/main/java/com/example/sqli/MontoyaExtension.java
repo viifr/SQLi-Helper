@@ -4,16 +4,10 @@ import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.Registration;
 import burp.api.montoya.ui.UserInterface;
-import burp.api.montoya.http.HttpService;
-import burp.api.montoya.http.message.requests.HttpRequest;
-import burp.api.montoya.http.message.HttpRequestResponse;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 public class MontoyaExtension implements BurpExtension {
     private JPanel panel;
@@ -59,19 +53,6 @@ public class MontoyaExtension implements BurpExtension {
             c.gridx = 1; JTextField condField = new JTextField(20); input.add(condField, c);
             row++;
 
-            // Test payload fields
-            c.gridx = 0; c.gridy = row; input.add(new JLabel("Target URL:"), c);
-            c.gridx = 1; JTextField urlField = new JTextField("http://target.com/page.php?id=1", 30); input.add(urlField, c);
-            row++;
-
-            c.gridx = 0; c.gridy = row; input.add(new JLabel("HTTP Method:"), c);
-            c.gridx = 1; JComboBox<String> methodBox = new JComboBox<>(new String[]{"GET", "POST"}); input.add(methodBox, c);
-            row++;
-
-            c.gridx = 0; c.gridy = row; input.add(new JLabel("Parameter name:"), c);
-            c.gridx = 1; JTextField paramField = new JTextField("id", 15); input.add(paramField, c);
-            row++;
-
             // Iteration controls
             c.gridx = 0; c.gridy = row; input.add(new JLabel("Charset:"), c);
             c.gridx = 1; JTextField charsetField = new JTextField("abcdefghijklmnopqrstuvwxyz0123456789", 20); input.add(charsetField, c);
@@ -90,8 +71,6 @@ public class MontoyaExtension implements BurpExtension {
             row++;
 
             c.gridx = 0; c.gridy = row; JButton genButton = new JButton("Generate"); input.add(genButton, c);
-            c.gridx = 1; JButton testButton = new JButton("Test Payload"); input.add(testButton, c);
-            row++;
 
             panel.add(input, BorderLayout.NORTH);
 
@@ -177,96 +156,11 @@ public class MontoyaExtension implements BurpExtension {
                 JOptionPane.showMessageDialog(panel, "Copied to clipboard");
             });
 
-            testButton.addActionListener(e -> testPayload(output, urlField, methodBox, paramField, montoyaApi, panel));
-
             // Register the panel as a suite tab in Burp via Montoya
             UserInterface ui = montoyaApi.userInterface();
             Registration reg = ui.registerSuiteTab("SQLi Helper", panel);
             // reg can be stored if you want to unregister later
         });
-    }
-
-    private void testPayload(JTextArea output, JTextField urlField, JComboBox<String> methodBox, JTextField paramField, MontoyaApi montoyaApi, JPanel panel) {
-        String payload = output.getText();
-        if (payload == null || payload.isEmpty()) {
-            JOptionPane.showMessageDialog(panel, "No payload to test. Generate one first.");
-            return;
-        }
-
-        String urlStr = urlField.getText().trim();
-        String method = (String) methodBox.getSelectedItem();
-        String paramName = paramField.getText().trim();
-
-        if (urlStr.isEmpty() || paramName.isEmpty()) {
-            JOptionPane.showMessageDialog(panel, "URL and parameter name required");
-            return;
-        }
-
-        try {
-            // Parse URL and inject payload into parameter
-            URL url = new URL(urlStr);
-            String host = url.getHost();
-            int port = url.getPort();
-            boolean useHttps = "https".equalsIgnoreCase(url.getProtocol());
-
-            if (port < 0) {
-                port = useHttps ? 443 : 80;
-            }
-
-            HttpService service = HttpService.httpService(host, port, useHttps);
-
-            // Build request with payload
-            String requestLine;
-            String body = "";
-
-            if ("GET".equalsIgnoreCase(method)) {
-                String query = url.getQuery() != null ? url.getQuery() : "";
-                String path = url.getPath();
-                if (path == null || path.isEmpty()) path = "/";
-
-                // Inject payload into GET parameter
-                String encodedPayload = URLEncoder.encode(payload, StandardCharsets.UTF_8);
-                if (query.isEmpty()) {
-                    query = paramName + "=" + encodedPayload;
-                } else {
-                    query += "&" + paramName + "=" + encodedPayload;
-                }
-
-                requestLine = "GET " + path + "?" + query + " HTTP/1.1\r\n" +
-                        "Host: " + host + "\r\n" +
-                        "User-Agent: Burp SQLi Helper\r\n" +
-                        "Connection: close\r\n\r\n";
-            } else {
-                // POST
-                String path = url.getPath();
-                if (path == null || path.isEmpty()) path = "/";
-
-                String encodedPayload = URLEncoder.encode(payload, StandardCharsets.UTF_8);
-                body = paramName + "=" + encodedPayload;
-
-                requestLine = "POST " + path + " HTTP/1.1\r\n" +
-                        "Host: " + host + "\r\n" +
-                        "User-Agent: Burp SQLi Helper\r\n" +
-                        "Content-Type: application/x-www-form-urlencoded\r\n" +
-                        "Content-Length: " + body.length() + "\r\n" +
-                        "Connection: close\r\n\r\n";
-            }
-
-            HttpRequest request = HttpRequest.httpRequest(service, requestLine + body);
-
-            // Send request via Burp
-            HttpRequestResponse httpResponse = montoyaApi.http().sendRequest(request);
-            
-            if (httpResponse != null && httpResponse.response() != null) {
-                output.setText("=== Response ===\n" + httpResponse.response().toString());
-            } else {
-                output.setText("No response received");
-            }
-
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(panel, "Error testing payload: " + ex.getMessage());
-            ex.printStackTrace();
-        }
     }
 
     private int parseInt(String s, int def) { try { return Integer.parseInt(s); } catch (Exception e) { return def; } }
