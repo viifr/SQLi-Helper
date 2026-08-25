@@ -1,6 +1,6 @@
 # SQLi Helper Burp Extension
 
-This extension is a Burp Suite helper for SQL injection workflows. It is designed to make it easier to generate and test payloads against a live application and iterate over an extracted value one character at a time.
+This extension is a Burp Suite helper for SQL injection workflows. It is designed to make it easier to generate and test payloads against a live application and iterate over an extracted value one character at a time. P.S This is my first project mainly to learn complex Java and understanding Montoya for future extensions, thank you!
 
 ## What it does
 
